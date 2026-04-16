@@ -248,8 +248,8 @@ with col2:
         st.session_state.audio_path = ""
         try:
             with st.spinner("Fetching video information..."):
-                # Using client='IOS' to bypass YouTube's WEB player cipher issues and avoid creator login requirements
-                yt = YouTube(url, client='IOS')
+                # Use client='TV' to avoid HTTP 400 issues with IOS client and Regex errors with WEB client
+                yt = YouTube(url, client='TV')
                 st.session_state.yt_info = {"title": yt.title, "url": url}
         except Exception as e:
             st.session_state.yt_info = None
@@ -272,7 +272,7 @@ with col2:
                 if st.button("Prepare Video Download", key="prep_vid"):
                     with st.spinner("Downloading video to server..."):
                         try:
-                            yt = YouTube(st.session_state.current_url, client='IOS')
+                            yt = YouTube(st.session_state.current_url, client='TV')
                             video_stream = yt.streams.get_highest_resolution()
                             video_path = video_stream.download(output_path="temp_downloads")
                             st.session_state.video_path = video_path
@@ -297,7 +297,7 @@ with col2:
                 if st.button("Prepare Audio Download", key="prep_aud"):
                     with st.spinner("Downloading audio to server..."):
                         try:
-                            yt = YouTube(st.session_state.current_url, client='IOS')
+                            yt = YouTube(st.session_state.current_url, client='TV')
                             audio_stream = yt.streams.get_audio_only()
                             audio_path = audio_stream.download(output_path="temp_downloads")
                             st.session_state.audio_path = audio_path
