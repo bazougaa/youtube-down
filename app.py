@@ -219,6 +219,20 @@ with col2:
     st.markdown('<div class="converter-box">', unsafe_allow_html=True)
     st.markdown('<h1 class="converter-title">Youtube to MP4 Converter</h1>', unsafe_allow_html=True)
     
+    # Initialize session state variables
+    if 'current_url' not in st.session_state:
+        st.session_state.current_url = ""
+    if 'yt_info' not in st.session_state:
+        st.session_state.yt_info = None
+    if 'video_ready' not in st.session_state:
+        st.session_state.video_ready = False
+    if 'audio_ready' not in st.session_state:
+        st.session_state.audio_ready = False
+    if 'video_path' not in st.session_state:
+        st.session_state.video_path = ""
+    if 'audio_path' not in st.session_state:
+        st.session_state.audio_path = ""
+
     # Input form
     form_col1, form_col2 = st.columns([4, 1])
     with form_col1:
@@ -226,55 +240,81 @@ with col2:
     with form_col2:
         start_btn = st.button("Start ➔")
     
+    if start_btn and url:
+        st.session_state.current_url = url
+        st.session_state.video_ready = False
+        st.session_state.audio_ready = False
+        st.session_state.video_path = ""
+        st.session_state.audio_path = ""
+        try:
+            with st.spinner("Fetching video information..."):
+                # Using client='WEB' to bypass some YouTube blocks
+                yt = YouTube(url, client='WEB')
+                st.session_state.yt_info = {"title": yt.title, "url": url}
+        except Exception as e:
+            st.session_state.yt_info = None
+            st.error(f"Error fetching video: {str(e)}")
+
     st.markdown('<p style="font-size: 12px; color: #777; margin-top: 15px;">By using our service you are accepting our <a href="#" style="color: #555;">terms of service.</a></p>', unsafe_allow_html=True)
     st.markdown('<div style="background-color: #f8f9fa; padding: 10px; border-top: 1px solid #eee; margin-top: 20px;"><p style="font-size: 13px; color: #555; margin: 0;"><b>Tip:</b> Insert "<b>pi</b>" after "<b>youtube</b>" in the URL bar to download mp4 and mp3 files from Youtube in a faster way.</p></div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Download logic
-    if start_btn and url:
-        try:
-            with st.spinner("Fetching video information..."):
-                yt = YouTube(url, use_oauth=False, allow_oauth_cache=True)
-                st.success(f"Found: {yt.title}")
-                
-                # Get streams
-                video_stream = yt.streams.get_highest_resolution()
-                audio_stream = yt.streams.get_audio_only()
-                
-                # Provide download buttons
-                dl_col1, dl_col2 = st.columns(2)
-                
-                # Create a temporary directory if not exists
-                os.makedirs("temp_downloads", exist_ok=True)
-                
-                with dl_col1:
-                    st.info("Video (MP4)")
-                    if st.button("Prepare Video Download"):
-                        with st.spinner("Downloading video to server..."):
+    if st.session_state.yt_info and st.session_state.current_url:
+        st.success(f"Found: {st.session_state.yt_info['title']}")
+        
+        dl_col1, dl_col2 = st.columns(2)
+        os.makedirs("temp_downloads", exist_ok=True)
+        
+        with dl_col1:
+            st.info("Video (MP4)")
+            if not st.session_state.video_ready:
+                if st.button("Prepare Video Download", key="prep_vid"):
+                    with st.spinner("Downloading video to server..."):
+                        try:
+                            yt = YouTube(st.session_state.current_url, client='WEB')
+                            video_stream = yt.streams.get_highest_resolution()
                             video_path = video_stream.download(output_path="temp_downloads")
-                            with open(video_path, "rb") as file:
-                                btn = st.download_button(
-                                    label="📥 Download Video",
-                                    data=file,
-                                    file_name=f"{yt.title}.mp4",
-                                    mime="video/mp4"
-                                )
-                
-                with dl_col2:
-                    st.info("Audio (MP3/M4A)")
-                    if st.button("Prepare Audio Download"):
-                        with st.spinner("Downloading audio to server..."):
+                            st.session_state.video_path = video_path
+                            st.session_state.video_ready = True
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to prepare video: {e}")
+            else:
+                if os.path.exists(st.session_state.video_path):
+                    with open(st.session_state.video_path, "rb") as file:
+                        st.download_button(
+                            label="📥 Download Video",
+                            data=file,
+                            file_name=f"{st.session_state.yt_info['title']}.mp4",
+                            mime="video/mp4",
+                            key="dl_vid"
+                        )
+                        
+        with dl_col2:
+            st.info("Audio (MP3/M4A)")
+            if not st.session_state.audio_ready:
+                if st.button("Prepare Audio Download", key="prep_aud"):
+                    with st.spinner("Downloading audio to server..."):
+                        try:
+                            yt = YouTube(st.session_state.current_url, client='WEB')
+                            audio_stream = yt.streams.get_audio_only()
                             audio_path = audio_stream.download(output_path="temp_downloads")
-                            with open(audio_path, "rb") as file:
-                                btn = st.download_button(
-                                    label="📥 Download Audio",
-                                    data=file,
-                                    file_name=f"{yt.title}.m4a",
-                                    mime="audio/m4a"
-                                )
-                                
-        except Exception as e:
-            st.error(f"Error fetching video: {str(e)}")
+                            st.session_state.audio_path = audio_path
+                            st.session_state.audio_ready = True
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to prepare audio: {e}")
+            else:
+                if os.path.exists(st.session_state.audio_path):
+                    with open(st.session_state.audio_path, "rb") as file:
+                        st.download_button(
+                            label="📥 Download Audio",
+                            data=file,
+                            file_name=f"{st.session_state.yt_info['title']}.m4a",
+                            mime="audio/m4a",
+                            key="dl_aud"
+                        )
 
 # Content section
 st.markdown("""
